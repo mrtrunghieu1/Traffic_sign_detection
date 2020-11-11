@@ -78,6 +78,5 @@ tensorboard --host 192.168.54.158 --port 8003 --logdir runs/
 * weight = 'best.pt' when training 4500 images
 ```bash
 python detect.py --source data/samples/traffic_public_test/images --cfg cfg/yolov3-spp.cfg --weights weights/best.pt --names data/coco.names --device 1 --save-txt
-
 ```
 
