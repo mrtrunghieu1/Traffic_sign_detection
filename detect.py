@@ -3,7 +3,7 @@ import argparse
 from models import *  # set ONNX_EXPORT in models.py
 from utils.datasets import *
 from utils.utils import *
-
+import json
 
 def detect(save_img=False):
     imgsz = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
@@ -77,6 +77,10 @@ def detect(save_img=False):
     t0 = time.time()
     img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
     _ = model(img.half() if half else img.float()) if device.type != 'cpu' else None  # run once
+
+
+    list_json = []
+
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -123,9 +127,29 @@ def detect(save_img=False):
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        with open(save_path[:save_path.rfind('.')] + '.txt', 'a') as file:
-                            file.write(('%g ' * 5 + '\n') % (cls, *xywh))  # label format
+
+                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1).tolist()  # normalized xywh
+                        # xywh = xywh.tolist()
+
+                        xywh[0] = xywh[0] - xywh[2]/2
+                        xywh[1] = xywh[1] - xywh[3]/2
+                    
+                        cls = int(cls.tolist())
+                        conf = conf.tolist()
+
+                        id = int(save_path[:save_path.rfind('.')].split('/')[-1])
+
+                        dictionary = {"image_id": id, 
+                                    "category_id": cls + 1,
+                                    "bbox": xywh,
+                                    "score": conf}
+
+                        list_json.append(dictionary)
+                        # with open(save_path[:save_path.rfind('.')] + '.txt', 'a') as file:
+                            
+                        #     file.write(('%g ' * 6 + '\n') % (cls, *xywh, conf))  # label format
+                
+
 
                     if save_img or view_img:  # Add bbox to image
                         label = '%s %.2f' % (names[int(cls)], conf)
@@ -155,6 +179,10 @@ def detect(save_img=False):
                         h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                         vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*opt.fourcc), fps, (w, h))
                     vid_writer.write(im0)
+
+
+    with open('./public_samples_submission.json', 'w') as json_file:
+        json.dump(list_json, json_file, indent=4)
 
     if save_txt or save_img:
         print('Results saved to %s' % os.getcwd() + os.sep + out)
@@ -189,3 +217,4 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         detect()
+
